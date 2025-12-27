@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Mobilcard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        html, body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #009036;
+        }
+        
+        #root {
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Mobilcard Logo Component - exact replica
+        const MobilcardLogo = () => (
+            <svg width="90" height="50" viewBox="0 0 90 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="0.5" y="0.5" width="89" height="49" rx="5.5" fill="white" stroke="#e8e8e8"/>
+                <path d="M10 38V12h6l8 13 8-13h6v26h-5V22l-7 11h-4l-7-11v16h-5z" fill="#8B1538"/>
+                <circle cx="58" cy="18" r="4.5" fill="#8B1538"/>
+                <circle cx="70" cy="18" r="4.5" fill="#8B1538"/>
+                <circle cx="58" cy="31" r="4.5" fill="#8B1538"/>
+                <circle cx="70" cy="31" r="4.5" fill="#8B1538"/>
+                <circle cx="82" cy="31" r="4.5" fill="#8B1538"/>
+            </svg>
+        );
+
+        // QR Code Component (SVG representation)
+        const QRCode = () => {
+            // Generate a realistic-looking QR code pattern
+            const modules = [];
+            const size = 33;
+            
+            // Create a pseudo-random but deterministic pattern
+            const seed = 12345;
+            const random = (x, y) => {
+                const val = Math.sin(seed + x * 1000 + y) * 10000;
+                return val - Math.floor(val) > 0.5;
+            };
+
+            // Position detection patterns (corners)
+            const isPositionPattern = (x, y) => {
+                // Top-left
+                if (x < 7 && y < 7) return true;
+                // Top-right
+                if (x >= size - 7 && y < 7) return true;
+                // Bottom-left
+                if (x < 7 && y >= size - 7) return true;
+                return false;
+            };
+
+            const isPositionPatternWhite = (x, y) => {
+                const patterns = [
+                    { ox: 0, oy: 0 },
+                    { ox: size - 7, oy: 0 },
+                    { ox: 0, oy: size - 7 }
+                ];
+                
+                for (const p of patterns) {
+                    const lx = x - p.ox;
+                    const ly = y - p.oy;
+                    if (lx >= 0 && lx < 7 && ly >= 0 && ly < 7) {
+                        // Outer border
+                        if (lx === 0 || lx === 6 || ly === 0 || ly === 6) return false;
+                        // Inner white
+                        if (lx >= 1 && lx <= 5 && ly >= 1 && ly <= 5) {
+                            // Inner black square
+                            if (lx >= 2 && lx <= 4 && ly >= 2 && ly <= 4) return false;
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            };
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    let fill = false;
+                    
+                    if (isPositionPattern(x, y)) {
+                        fill = !isPositionPatternWhite(x, y);
+                    } else if (y === 6 || x === 6) {
+                        // Timing patterns
+                        fill = (x + y) % 2 === 0;
+                    } else {
+                        fill = random(x, y);
+                    }
+                    
+                    if (fill) {
+                        modules.push(
+                            <rect 
+                                key={`${x}-${y}`}
+                                x={x * 10} 
+                                y={y * 10} 
+                                width="10" 
+                                height="10" 
+                                fill="black"
+                            />
+                        );
+                    }
+                }
+            }
+
+            return (
+                <svg width="100%" height="100%" viewBox="0 0 330 330" style={{ maxWidth: '280px', maxHeight: '280px' }}>
+                    {modules}
+                </svg>
+            );
+        };
+
+        // Main App Component
+        const MobilcardApp = () => {
+            const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+            const [activeTime, setActiveTime] = useState('21:39');
+            const videoRef = useRef(null);
+            const scrollContainerRef = useRef(null);
+
+            useEffect(() => {
+                // Update active journey time every second
+                const interval = setInterval(() => {
+                    const now = new Date();
+                    // Calculate time remaining in the day (assuming 24h ticket)
+                    const hours = 23 - now.getHours();
+                    const minutes = 59 - now.getMinutes();
+                    setActiveTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+                }, 1000);
+
+                return () => clearInterval(interval);
+            }, []);
+
+            const handleCheckValidity = () => {
+                setIsVideoPlaying(true);
+                setTimeout(() => {
+                    if (videoRef.current) {
+                        videoRef.current.currentTime = 0;
+                        videoRef.current.play().catch(e => console.log('Video play error:', e));
+                    }
+                }, 100);
+            };
+
+            const handleVideoEnded = () => {
+                setIsVideoPlaying(false);
+            };
+
+            const styles = {
+                container: {
+                    height: '100%',
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    backgroundColor: '#ffffff',
+                },
+                statusBar: {
+                    height: '54px',
+                    backgroundColor: '#ffffff',
+                    width: '100%',
+                    flexShrink: 0,
+                },
+                mainContent: {
+                    flex: 1,
+                    backgroundColor: '#009036',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    overflow: 'hidden',
+                },
+                header: {
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    padding: '20px 20px 16px 20px',
+                },
+                activeJourney: {
+                    color: '#ffffff',
+                    fontSize: '26px',
+                    fontWeight: '400',
+                    fontStyle: 'italic',
+                    letterSpacing: '-0.3px',
+                },
+                closeButton: {
+                    width: '36px',
+                    height: '36px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                },
+                scrollContainer: {
+                    flex: 1,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                    padding: '0 20px 30px 20px',
+                    WebkitOverflowScrolling: 'touch',
+                },
+                ticketCard: {
+                    backgroundColor: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '20px 22px 24px 22px',
+                    marginBottom: '12px',
+                },
+                logoContainer: {
+                    marginBottom: '6px',
+                },
+                cardTitle: {
+                    fontSize: '26px',
+                    fontWeight: '700',
+                    color: '#1a1a1a',
+                    marginBottom: '18px',
+                    letterSpacing: '-0.3px',
+                },
+                label: {
+                    fontSize: '15px',
+                    color: '#808080',
+                    marginBottom: '2px',
+                    fontWeight: '400',
+                },
+                value: {
+                    fontSize: '24px',
+                    fontWeight: '700',
+                    color: '#1a1a1a',
+                    marginBottom: '14px',
+                    letterSpacing: '-0.3px',
+                },
+                divider: {
+                    height: '1px',
+                    backgroundColor: '#e0e0e0',
+                    margin: '18px 0',
+                },
+                journeyLabel: {
+                    fontSize: '15px',
+                    color: '#808080',
+                    marginBottom: '10px',
+                },
+                routeBadge: {
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '36px',
+                    height: '36px',
+                    backgroundColor: '#454545',
+                    borderRadius: '10px',
+                    color: '#ffffff',
+                    fontSize: '18px',
+                    fontWeight: '600',
+                    marginBottom: '10px',
+                },
+                routeText: {
+                    fontSize: '22px',
+                    fontWeight: '700',
+                    color: '#1a1a1a',
+                    lineHeight: '1.35',
+                    letterSpacing: '-0.3px',
+                },
+                qrCard: {
+                    backgroundColor: '#ffffff',
+                    borderRadius: '16px',
+                    padding: '30px 24px 28px 24px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    minHeight: '420px',
+                },
+                qrCodeContainer: {
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    width: '100%',
+                    flex: 1,
+                    padding: '10px 0',
+                },
+                videoContainer: {
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    flex: 1,
+                },
+                video: {
+                    width: '100%',
+                    height: 'auto',
+                    maxHeight: '340px',
+                    objectFit: 'contain',
+                },
+                checkButton: {
+                    backgroundColor: '#0095c8',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '26px',
+                    padding: '15px 36px',
+                    fontSize: '17px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginTop: '12px',
+                    transition: 'background-color 0.2s',
+                    letterSpacing: '0.2px',
+                },
+                homeIndicator: {
+                    position: 'absolute',
+                    bottom: '8px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '134px',
+                    height: '5px',
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '3px',
+                    opacity: 0.25,
+                },
+            };
+
+            return (
+                <div style={styles.container}>
+                    {/* Empty white status bar area */}
+                    <div style={styles.statusBar}></div>
+                    
+                    {/* Main green content area */}
+                    <div style={styles.mainContent}>
+                        {/* Header with Active Journey and Close button */}
+                        <div style={styles.header}>
+                            <span style={styles.activeJourney}>Active journey {activeTime}</span>
+                            <button style={styles.closeButton} aria-label="Close">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M18 6L6 18M6 6l12 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Scrollable content */}
+                        <div style={styles.scrollContainer} ref={scrollContainerRef}>
+                            {/* Ticket Info Card */}
+                            <div style={styles.ticketCard}>
+                                <div style={styles.logoContainer}>
+                                    <MobilcardLogo />
+                                </div>
+                                <div style={styles.cardTitle}>Mobilcard 1 day</div>
+                                
+                                <div style={styles.label}>Validated</div>
+                                <div style={styles.value}>27.11.2025, 07:41</div>
+                                
+                                <div style={styles.label}>Ticket holder</div>
+                                <div style={styles.value}>Vadym Yeremiichuk</div>
+                                
+                                <div style={styles.divider}></div>
+                                
+                                <div style={styles.journeyLabel}>Journey planner</div>
+                                <div style={styles.routeBadge}>R</div>
+                                <div style={styles.routeText}>
+                                    Bahnhof Sterzing - Pfitsch – Bahnhof Meran
+                                </div>
+                            </div>
+
+                            {/* QR Code / Video Card */}
+                            <div style={styles.qrCard}>
+                                {isVideoPlaying ? (
+                                    <div style={styles.videoContainer}>
+                                        <video 
+                                            ref={videoRef}
+                                            style={styles.video}
+                                            onEnded={handleVideoEnded}
+                                            playsInline
+                                            muted
+                                        >
+                                            <source src="animation_final.mp4" type="video/mp4" />
+                                        </video>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div style={styles.qrCodeContainer}>
+                                            <QRCode />
+                                        </div>
+                                        <button 
+                                            style={styles.checkButton}
+                                            onClick={handleCheckValidity}
+                                            onMouseOver={(e) => e.target.style.backgroundColor = '#0080b0'}
+                                            onMouseOut={(e) => e.target.style.backgroundColor = '#0095c8'}
+                                        >
+                                            Check validity
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Home indicator */}
+                        <div style={styles.homeIndicator}></div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<MobilcardApp />);
+    </script>
+</body>
+</html>
